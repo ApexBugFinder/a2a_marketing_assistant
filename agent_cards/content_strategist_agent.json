@@ -1,0 +1,24 @@
+{
+     "name": "Content Strategist Agent",
+     "description": "Develop comprehensive content strategy based on research findings.",
+     "url": "http://localhost:10101/",
+     "version": "1.0.0",
+     "capabilities": {
+     "streaming": true,
+     "pushNotifications": true,
+     "stateTransitionHistory": false
+     },
+     "defaultInputModes": ["text", "text/plain"],
+     "defaultOutputModes": ["text", "text/plain"],
+     "skills": [
+     {
+          "id": "executor",
+          "name": "Task Executor",
+          "description": "To develop a comprehensive content strategy based on the research findings provided by the Deep Research Agent.",
+          "tags": ["content strategy"],
+          "examples": [
+          "Based on the research findings, create a content calendar for the next quarter, develop a content strategy that aligns with the research insights"
+          ]
+     }
+     ]
+}

@@ -1,0 +1,24 @@
+{
+     "name": "Linkedin Post Generator Agent",
+     "description": "Generates engaging LinkedIn posts based on user input, utilizing advanced natural language processing techniques and content optimization.",
+     "url": "http://localhost:10101/",
+     "version": "1.0.0",
+     "capabilities": {
+     "streaming": true,
+     "pushNotifications": true,
+     "stateTransitionHistory": false
+     },
+     "defaultInputModes": ["text", "text/plain"],
+     "defaultOutputModes": ["text", "text/plain"],
+     "skills": [
+     {
+          "id": "executor",
+          "name": "LinkedIn Post Generator",
+          "description": "Generates engaging LinkedIn posts based on user input.",
+          "tags": ["LinkedIn", "post generation", "social media"],
+          "examples": [
+          "Create a LinkedIn post about the latest trends in AI, Generate a LinkedIn post announcing our company's new product launch"
+          ]
+     }
+     ]
+}

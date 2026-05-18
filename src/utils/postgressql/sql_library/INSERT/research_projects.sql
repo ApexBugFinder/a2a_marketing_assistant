@@ -1,0 +1,2 @@
+INSERT INTO "public".research_project_information (id, research_project_id, research_topic, research_overview, research_objectives, research_scope, research_framework)
+VALUES ($1, $2, $3, $4, $5, $6, $7);

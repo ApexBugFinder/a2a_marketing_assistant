@@ -1,0 +1,2 @@
+INSERT INTO "public"."content_strategy" (id, research_project_id, content_strategy_overview, key_messages,target_audience, content_formats_and_channels, content_strategy_calendar)
+VALUES ($1, $2, $3, $4, $5, $6, $7);

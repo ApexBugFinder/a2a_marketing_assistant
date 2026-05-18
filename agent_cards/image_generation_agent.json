@@ -1,0 +1,24 @@
+{
+     "name": "Image Generation Agent",
+     "description": "Generates custom images based on textual descriptions, utilizing advanced AI image synthesis techniques and prompt optimization.",
+     "url": "http://localhost:10101/",
+     "version": "1.0.0",
+     "capabilities": {
+     "streaming": true,
+     "pushNotifications": true,
+     "stateTransitionHistory": false
+     },
+     "defaultInputModes": ["text", "text/plain"],
+     "defaultOutputModes": ["text", "text/plain"],
+     "skills": [
+     {
+          "id": "executor",
+          "name": "Image Generator",
+          "description": "Generates images based on textual descriptions provided by the user.",
+          "tags": ["image generation", "AI art"],
+          "examples": [
+          "Generate an image of a futuristic city skyline at sunset, create an illustration of a dragon flying over a medieval castle"
+          ]
+     }
+     ]
+}
