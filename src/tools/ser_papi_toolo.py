@@ -3,8 +3,8 @@ import os
 from langchain.tools import tool
 from langsmith import traceable
 
-from src.config.serpapi_main_topic_config import MainTopicConfig
-from src.config.serpapi_key_aspect_config import KeyAspectConfig
+from config.serpapi_main_topic_config import Config as MainTopicConfig
+from config.serpapi_key_aspect_config import Config as KeyAspectConfig
 import serpapi
 from langchain_core.tools import StructuredTool
 
@@ -88,7 +88,7 @@ class SerpApiTool:
 
           return self.clean_results(results)
 
-     def clean_results(self, results: dict) -> list[SerpapiOutput]:
+     def clean_results(self, results: dict) -> list[_SerpapiOutput]:
           """A helper function to clean the results returned by the SerpAPI and extract the relevant information."""
           cleaned_results = []
           for result in results.get('organic_results', []):

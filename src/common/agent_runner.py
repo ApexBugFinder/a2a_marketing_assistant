@@ -6,7 +6,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from dotenv import load_dotenv
-from mcp import os
+import os
 
 ### TODO Refactor this to accept PostgresSaver
 class AgentRunner:
@@ -16,7 +16,7 @@ class AgentRunner:
      It uses an in-memory session service."""
 
      def __init__(self, user_id: str = 'user_1',
-                    app_name: str = os.getenv('APP_NAME', 'chatbot_a2a')):
+                    app_name: str = os.getenv('APP_NAME', 'chatbot_a2a_marketing_assistant')):
           self.session_service = InMemorySessionService()
           self.session = None
           self.app_name = app_name
@@ -77,7 +77,7 @@ class AgentRunner:
                          p.function_response.model_dump()
                          for p in event.content.parts )
                else:
-                    resonse = f"Error in running agent: {agent.name}"
+                    response = f"Error in running agent: {agent.name}"
                yield {
                     'type': 'final_result',
                     'response': response

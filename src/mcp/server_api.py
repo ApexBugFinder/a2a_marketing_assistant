@@ -1,11 +1,18 @@
 from fastmcp import FastMCP
-from src.tools.pinecone_retriever import PineconeRetrieverTool
+from fastapi import FastAPI, HTTPException, Query, status
+from pydantic import BaseModel, EmailStr, Field
 from tools.pinecone_pusher_tool import PineconePusherTool
-from src.tools.postgres_tools import PostgresTools
-from src.tools.ser_papi_toolo import SerpApiTool
+from tools.pinecone_retriever import PineconeRetrieverTool
+from tools.postgres_tools import PostgresTools
+from tools.ser_papi_toolo import SerpApiTool
+mcp = FastMCP('Marketing Assistant Tools Server')
 
-mcp = FastMCP('Marketing Assistant Server')
 
+
+
+
+
+# SUPPORTING  TOOLS
 # PINECONE TOOLS
 @mcp.tool()
 def pinecone_scrape_and_push_tool(result_dict: dict[str, str]):
@@ -52,8 +59,6 @@ def serpapi_key_aspect_search_tool(query: str):
      """A tool to perform a web search using the SerpAPI to retrieve relevant information and documents related to a specific aspect of the research topic."""
      return SerpApiTool().serpapi_key_aspect_search(query)
 
-
-#
 if __name__ == "__main__":
      print('Starting MCP Server...')
      mcp.run(transport='streamable-http', host='0.0.0.0', port=8020)
