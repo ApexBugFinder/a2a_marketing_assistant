@@ -1,43 +1,46 @@
-"""Convenience methods to start servers."""
+# """Convenience methods to start servers."""
 
-import click
+# from dotenv import load_dotenv
+# load_dotenv()
 
-from mcp import server_agents
-from mcp import app
+# import click
 
-
-
-@click.command()
-@click.option('--run', 'command', default='mcp-server', help='Command to run')
-@click.option(
-     '--host',
-     'host',
-     default='localhost',
-     help='Host on which the server is started or the client connects to',
-)
-@click.option(
-     '--port',
-     'port',
-     default=10100,
-     help='Port on which the server is started or the client connects to',
-)
-@click.option(
-     '--transport',
-     'transport',
-     default='stdio',
-     help='MCP Transport',
-)
-def main(command, host, port, transport) -> None:
-     # TODO: Add other servers, perhaps dynamic port allocation
-     if command == 'mcp-server':
-          # run agents server
-          server_agents.serve(host, port, transport)
-          # run python3 app.py to start the API server
-          app.run()
+# from mcp_server.server_agents import serve
+# from mcp_server import app
 
 
 
+# @click.command()
+# @click.option('--run', 'command', default='mcp-server', help='Command to run')
+# @click.option(
+#      '--host',
+#      'host',
+#      default='localhost',
+#      help='Host on which the server is started or the client connects to',
+# )
+# @click.option(
+#      '--port',
+#      'port',
+#      default=10100,
+#      help='Port on which the server is started or the client connects to',
+# )
+# @click.option(
+#      '--transport',
+#      'transport',
+#      default='stdio',
+#      help='MCP Transport',
+# )
+# def main(command, host, port, transport) -> None:
+#      # TODO: Add other servers, perhaps dynamic port allocation
+#      if command == 'mcp-server':
+#           # run agents server
+#           serve(host, port, transport)
+#           # run python3 app.py to start the API server
+#           app.run()
 
 
-     else:
-          raise ValueError(f'Unknown run option: {command}')
+
+
+
+     # else:
+     #      raise ValueError(f'Unknown run option: {command}')

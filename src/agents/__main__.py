@@ -3,25 +3,49 @@ import json
 import logging
 import sys
 
+
+class _OtelDetachFilter(logging.Filter):
+    """Suppress the 'Failed to detach context' ValueError spam from google-adk's
+    OTel integration. These occur when async-generator cleanup runs in a different
+    asyncio context than where the span token was created — a known OTel+asyncio
+    limitation (https://github.com/open-telemetry/opentelemetry-python/issues/2606).
+    The errors are non-fatal; suppressing them keeps logs actionable."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        return 'Failed to detach context' not in record.getMessage()
+
+
+logging.getLogger('opentelemetry').addFilter(_OtelDetachFilter())
+
 from pathlib import Path
 
 import click
 import httpx
 import uvicorn
 
-from a2a.server.apps import A2AStarletteApplication
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.routes.agent_card_routes import create_agent_card_routes
+from a2a.server.routes.rest_routes import create_rest_routes
 from a2a.server.tasks import (
 BasePushNotificationSender,
 InMemoryPushNotificationConfigStore,
 InMemoryTaskStore,
 )
 from a2a.types import AgentCard
-from common import prompts
+from a2a.client.card_resolver import parse_agent_card
+from common.instructions.aspectuator_agent_cot import ASPECTUATOR_AGENT_COT_INSTRUCTIONS
+from common.instructions.deep_research_agent_cot import DEEP_RESEARCH_AGENT_COT_INSTRUCTIONS
+from common.instructions.content_strategist_agent_cot import CONTENT_STRATEGIST_AGENT_COT_INSTRUCTIONS
+from common.instructions.seo_blog_writer_agent_cot import SEO_BLOG_WRITER_AGENT_COT_INSTRUCTIONS
+from common.instructions.linkedin_post_generator_agent_cot import LINKEDIN_POSTER_COT_INSTRUCTION
+from common.instructions.marketing_assistant_agent_cot import MARKETING_ASSISTANT_AGENT_COT_INSTRUCTION
+from common.instructions.image_generation_agent_cot import IMAGE_GENERATION_COT_INSTRUCTION
 from common.agent_executor import GenericAgentExecutor
-from adk_travel_agent import TravelAgent
-from planner_agent import LangGraphPlannerAgent
-from orchestrator_agent import OrchestratorAgent
+from agents.marketing_assistant_agent import MarketingAssistantAgent
+from agents.planner_agent import PlannerAgent
+from agents.orchestrator_agent import OrchestratorAgent
 
 
 logger = logging.getLogger(__name__)
@@ -30,31 +54,73 @@ logger = logging.getLogger(__name__)
 def get_agent(agent_card: AgentCard):
      """Get the agent, given an agent card."""
      try:
-          if agent_card.name == 'Orchestrator Agent':
-               return OrchestratorAgent()
-          if agent_card.name == 'Langraph Planner Agent':
-               return LangGraphPlannerAgent()
-          if agent_card.name == 'Air Ticketing Agent':
-               return TravelAgent(
-                    agent_name='AirTicketingAgent',
-                    description='Book air tickets given a criteria',
-                    instructions=prompts.AIRFARE_COT_INSTRUCTIONS,
-               )
-          if agent_card.name == 'Hotel Booking Agent':
-               return TravelAgent(
-                    agent_name='HotelBookingAgent',
-                    description='Book hotels given a criteria',
-                    instructions=prompts.HOTELS_COT_INSTRUCTIONS,
-               )
-          if agent_card.name == 'Car Rental Agent':
-               return TravelAgent(
-                    agent_name='CarRentalBookingAgent',
-                    description='Book rental cars given a criteria',
-                    instructions=prompts.CARS_COT_INSTRUCTIONS,
-               )
-               # return LangraphCarRentalAgent()
+          match agent_card.name:
+               case 'Orchestrator Agent':
+                    return OrchestratorAgent()
+               case 'Planner Agent':
+                    return PlannerAgent()
+               case 'Marketing Assistant Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='MarketingAssistantAgent',
+                         description='Provides marketing insights and recommendations based on research findings, and collaborates with the marketing team to ensure that the strategies proposed are actionable and aligned with the overall marketing goals, while also being adaptable and able to evolve based on new research insights and the ongoing market dynamics.',
+                         instructions=MARKETING_ASSISTANT_AGENT_COT_INSTRUCTION,
+                    )
+               case 'Image Generation Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='ImageGenerationAgent',
+                         description='Generates images based on the research findings and content strategy, and collaborates with the marketing team to ensure that the images produced are of high quality, effectively communicate the key messages from the research findings, and are aligned with the overall content strategy, while also being adaptable and able to evolve based on new research insights and the ongoing research process, allowing for continuous improvement and optimization of the images created based on the research findings.',
+                         instructions=IMAGE_GENERATION_COT_INSTRUCTION,
+                    )
+               case 'Deep Research Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='DeepResearchAgent',
+                         description='Conduct deep research on a given topic',
+                         instructions=DEEP_RESEARCH_AGENT_COT_INSTRUCTIONS,
+                    )
+               case 'Aspectuator Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='AspectuatorAgent',
+                         description='Creates new queries based on key words and key aspects of the research topic',
+                         instructions=ASPECTUATOR_AGENT_COT_INSTRUCTIONS,
+                    )
+               case 'Content Strategist Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='ContentStrategistAgent',
+                         description='Develops content strategies for marketing campaigns',
+                         instructions=CONTENT_STRATEGIST_AGENT_COT_INSTRUCTIONS,
+                    )
+               case 'SEO Blog Writer Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='SEOBlogWriterAgent',
+                         description='Writes SEO-optimized blog posts based on the research findings and content strategy',
+                         instructions=SEO_BLOG_WRITER_AGENT_COT_INSTRUCTIONS,
+                    )
+               case 'LinkedIn Post Generator Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='LinkedInPostGeneratorAgent',
+                         description='Generates LinkedIn posts based on the research findings and content strategy',
+                         instructions=LINKEDIN_POSTER_COT_INSTRUCTION,
+                    )
+               case _:
+                    raise ValueError(f"Unknown agent card: '{agent_card.name}'")
      except Exception as e:
           raise e
+
+
+def _resolve_agent_card_path(agent_card: str) -> Path:
+     """Resolve agent card path — try as-is first, then relative to the project root."""
+     p = Path(agent_card)
+     if p.exists():
+          return p
+     # Walk up from this file (src/agents/__main__.py) to find the project root.
+     project_root = Path(__file__).resolve().parents[2]
+     fallback = project_root / agent_card
+     if fallback.exists():
+          return fallback
+     raise FileNotFoundError(
+          f"Agent card not found: '{agent_card}'. "
+          f"Tried '{p.resolve()}' and '{fallback}'."
+     )
 
 
 @click.command()
@@ -66,9 +132,9 @@ def main(host, port, agent_card):
      try:
           if not agent_card:
                raise ValueError('Agent card is required')
-          with Path.open(agent_card) as file:
+          with _resolve_agent_card_path(agent_card).open() as file:
                data = json.load(file)
-          agent_card = AgentCard(**data)
+          agent_card = parse_agent_card(data)
 
           client = httpx.AsyncClient()
           push_notification_config_store = InMemoryPushNotificationConfigStore()
@@ -79,17 +145,28 @@ def main(host, port, agent_card):
           request_handler = DefaultRequestHandler(
                agent_executor=GenericAgentExecutor(agent=get_agent(agent_card)),
                task_store=InMemoryTaskStore(),
+               agent_card=agent_card,
                push_config_store=push_notification_config_store,
                push_sender=push_notification_sender,
           )
 
-          server = A2AStarletteApplication(
-               agent_card=agent_card, http_handler=request_handler
+          routes = create_agent_card_routes(agent_card=agent_card)
+          routes += create_rest_routes(request_handler=request_handler)
+          server = Starlette(
+               routes=routes,
+               middleware=[
+                    Middleware(
+                         CORSMiddleware,
+                         allow_origins=['*'],
+                         allow_methods=['*'],
+                         allow_headers=['*'],
+                    )
+               ],
           )
 
           logger.info(f'Starting server on {host}:{port}')
 
-          uvicorn.run(server.build(), host=host, port=port)
+          uvicorn.run(server, host=host, port=port)
      except FileNotFoundError:
           logger.error(f"Error: File '{agent_card}' not found.")
           sys.exit(1)

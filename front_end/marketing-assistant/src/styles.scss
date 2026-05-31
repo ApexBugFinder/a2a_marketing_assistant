@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+/* LinkedIn-style design tokens */
+:root {
+  --li-blue: #0a66c2;
+  --li-blue-hover: #004182;
+  --li-blue-active: #00396f;
+  --li-bg: #f4f2ee;
+  --li-surface: #ffffff;
+  --li-border: #e0dfdc;
+  --li-text: #000000e6;        /* ~0.9 opacity black */
+  --li-text-muted: #00000099;  /* ~0.6 opacity black */
+  --li-radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  background: var(--li-bg);
+  color: var(--li-text);
+}

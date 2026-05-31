@@ -1,11 +1,13 @@
-from typing import Any, Literal
+from langchain_core.documents import Document
+from typing import Any, List, Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import values
 
 class ServerConfig(BaseModel):
      host: str = Field(default="localhost", description="The host to run the server on")
      port: int = Field(default=10101, description="The port to run the server on")
-     transport:str = Field(default="http", description="The transport protocol to use (e.g. http, grpc)")
+     transport: str = Field(default="streamable-http", description="The transport protocol to use (streamable-http, sse, stdio)")
+     path: str = Field(default="/mcp", description="URL path the MCP server is mounted at (e.g. /mcp, /tools/mcp, /agents/mcp)")
 
 
 class PlannerTask(BaseModel):
@@ -13,6 +15,7 @@ class PlannerTask(BaseModel):
 
      id: int = Field(description="Unique identifier for the task")
      description: str = Field(description="A brief and clear description of the task to be executed.")
+     research_project_id: Optional[str] = Field(default=None, description="The research_project_id for this campaign, passed from the Marketing Assistant Agent")
      status: (Any | Literal[
           'input_required',
           'completed',
@@ -22,50 +25,72 @@ class PlannerTask(BaseModel):
           'todo',
           'not_started'] | None) = Field(description="Current status of the task.", default='input_required')
 
-class TripInfo(BaseModel):
-     """Trip Information"""
-     total_budget:str | None = Field(description="Total budget for the trip")
-     origin:str | None = Field(description="Origin of the trip")
-     destiination: str | None = Field(description="Destination of the trip")
-     type : (Any | Literal['leisure', 'business'] | None) = Field(description="Type of the trip (leisure or business)")
-     start_date: str | None = Field (description="Start date of the trip")
-     end_date: str | None = Field(description="End date of the trip")
-     travel_class: (Any | Literal['first', 'business', 'economy'] | None) = Field(description="Travel class (e.g. economy, business, first)")
-     accommodation_type: (Any | Literal['Luxury Hotel', 'Budget Hotel', 'Hostel', 'airBnB'] | None) = Field(description="""
-                                                                                                         Preferred accommodation type, luxury hotel, budget hotel, hostel, airBnB, etc.""")
-     room_type : (Any | Literal['single', 'double', 'suite'] | None) = Field(description="Preferred room type (e.g. single, double, suite, or etc.)")
-     type_of_car: (Any | Literal['SUV', 'sedan', 'Truck', 'minivan'] | None) = Field(description="Preferred type of rental car (e.g. SUV, sedan, truck, minivan, etc.)")
-     is_car_rental_required: str | None = Field(description="Indicates whether car rental is required (true or false) for the trip")
-     no_of_travellers: str | None = Field(description="Number of travelers for the trip")
-     checkin_date :str | None = Field(description="Check-in date for the accommodation")
-     checkout_date : str | None = Field(description="Check-out date for the accommodation")
-     car_rental_start_date: str | None = Field(description="Start date for car rental")
-     car_rental_end_date: str | None = Field(description="End date for car rental")
 
-     @model_validator(mode='before')
-     @classmethod
-     def set_depenedent_var(cls, values):
-          """Pydantic dependent setters"""
-          if isinstance(values, dict) and 'start_date' in values:
-               values['checkin_date'] = values['start_date']
+class DeliverableStatus(BaseModel):
+     status: (Any | Literal[
+          'not_started',
+          'in_progress',
+          'waiting_for_review',
+          'needs_revision',
+          'approved',
+          'rejected',
+          'cancelled',
+          'completed',
+          ] | None) = Field(description="Current status of the deliverable.", default='not_started')
+     # @model_validator(mode='before')
+     # @classmethod
+     # def set_depenedent_var(cls, values):
+     #      """Pydantic dependent setters"""
+     #      if isinstance(values, dict) and 'start_date' in values:
+     #           values['checkin_date'] = values['start_date']
 
-          if isinstance(values, dict) and 'end_date' in values:
-               values['checkout_date'] = values['end_date']
+     #      if isinstance(values, dict) and 'end_date' in values:
+     #           values['checkout_date'] = values['end_date']
 
-          if isinstance(values, dict) and 'start_date' in values:
-               values['car_rental_start_date'] = values['start_date']
+     #      if isinstance(values, dict) and 'start_date' in values:
+     #           values['car_rental_start_date'] = values['start_date']
 
-          if isinstance(values, dict) and 'end_date' in values:
-               values['car_rental_end_date'] = values['end_date']
+     #      if isinstance(values, dict) and 'end_date' in values:
+     #           values['car_rental_end_date'] = values['end_date']
 
-          return values
+     #      return values
+
+
 
 
 class TaskList(BaseModel):
-     """Output schema for the Planner Agent."""
-     original_query: str | None = Field(description="The original user query that was provided to the PlannerAgent")
-     trip_info: TripInfo | None = Field(description="Trip Information")
-     tasks: list[PlannerTask] = Field(description="List of tasks generated by the PlannerAgent to be executed sequentially")
+     """A list of tasks generated by the PlannerAgent."""
+     original_query: str | None = Field(default=None,
+          description='The original user query for context.'
+     )
+     research_project_id: Optional[str] = Field(default=None, description="The research_project_id for this campaign, passed from the Marketing Assistant Agent")
+     research_context: str | None = Field(default=None,
+          description='Contextual information or research project related to the tasks.'
+     )
+     tasks: list[PlannerTask] = Field(default_factory=list, description="List of tasks to be executed sequentially.")
+
+
+class PlannerResponseFormat(BaseModel):
+     """Structured response format for the PlannerAgent."""
+     research_project_id: Optional[str] = Field(default=None, description="The research_project_id for this campaign, passed from the Marketing Assistant Agent")
+     status: Literal['input_required', 'completed', 'error'] = Field(
+          description=(
+               "The status of the agent's response. "
+               "'input_required' indicates that the agent needs more information from the user to proceed. "
+               "'completed' indicates that the agent has completed its task and has a final response. "
+               "'error' indicates that an error occurred during the agent's processing."
+          ),
+          default='input_required',
+     )
+     question: str | dict = Field(default='', description="Input needed from the user to generate the plan")
+     content: TaskList = Field(
+          default_factory=TaskList,
+          description=(
+               "List of tasks generated by the PlannerAgent to be executed sequentially. "
+               "Each task includes a description of the task, the agent responsible for executing it, "
+               "and any relevant parameters or information needed for execution."
+          )
+     )
 
 
 class AgentResponse(BaseModel):
@@ -73,3 +98,27 @@ class AgentResponse(BaseModel):
      content: str | dict = Field(description="The content of the agent's response, which can be a string or a structured dictionary depending on the context.")
      is_task_complete: bool = Field(description="Indicates whether the task associated with this response is complete.")
      require_user_input: bool = Field(description="Indicates whether the agent requires additional input from the user to proceed with task execution.")
+class LinkMetadata(BaseModel):
+     title: str
+     author: str
+     date: str
+     source: str
+
+class ScrapeAndPushArgs(BaseModel):
+     result_dict: dict[str, LinkMetadata] = Field(
+          description="Mapping of URL to its metadata (title, author, date, source) for each link to scrape and index."
+     )
+
+
+class ImageSaverS3Args(BaseModel):
+     image_url: str = Field(description="The URL of the image to be saved.")
+     s3_bucket_name: str = Field(description="The name of the S3 bucket where the image should be saved.")
+     s3_object_key: str = Field(description="The object key (path) in the S3 bucket where the image should be saved.")
+
+class ImageUrlInput(BaseModel):
+     image_url: str = Field(description="Long Image URL provided for a tool which returns a tiny URL")
+
+
+class PineconeResults(BaseModel):
+     serialized: str | None = Field (default_factory=None, description="The serialized results of the query")
+     retrieved_docs: List[Document] | None= Field (default_factory=None, description="The retrieved documents")

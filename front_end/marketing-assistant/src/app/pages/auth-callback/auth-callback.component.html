@@ -1,0 +1,17 @@
+<div class="callback-page">
+  @if (!error()) {
+    <div class="status">
+      <span class="spinner"></span>
+      <p>Signing you in with LinkedIn…</p>
+    </div>
+  } @else {
+    <div class="status error">
+      <span class="x-mark">!</span>
+      <h3>Sign-in failed</h3>
+      <p>We couldn't complete the LinkedIn sign-in. Please try again.</p>
+      <button type="button" class="retry-btn" (click)="backToLogin()">
+        Back to sign in
+      </button>
+    </div>
+  }
+</div>

@@ -1,3 +1,3 @@
-SELECT * FROM blog_content
+SELECT * FROM "public".blog_content
 WHERE research_project_id = $1
-ORDER BY created_at DESC;
+ORDER BY (metadata->>'created_at') DESC NULLS LAST;

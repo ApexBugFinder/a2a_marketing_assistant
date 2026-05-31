@@ -9,7 +9,7 @@ class Config:
      """SerpAPI Tool is a tool that allows you to search the web using the SerpAPI for documents and articles.
      """
      SERP_API_KEY: str = os.getenv("SERP_API_KEY")
-     ENGINE: str = "google"
+     ENGINE: str = "google_scholar"
      DEVICE:str = "desktop"
      HL:str = "en"
      GL:str = "us"

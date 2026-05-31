@@ -1,22 +1,34 @@
 {
-     "name": "Deep Research Agent",
-     "description": "Conducts comprehensive research on a given topic, utilizing web research and detailed analysis of the information found.",
-     "url": "http://localhost:10101/",
-     "version": "1.0.0",
-     "capabilities": {
-     "streaming": true,
-     "pushNotifications": true,
-     "stateTransitionHistory": false
-     },
-     "defaultInputModes": ["text", "text/plain"],
-     "defaultOutputModes": ["text", "text/plain"],
-     "skills": [
-     {
-          "id": "executor",
-          "name": "Task Executor",
-          "description": "Conducts comprehensive research on a given topic, utilizing web research and detailed analysis of the information found.",
-          "tags": ["deep research"],
-          "examples": ["Research the impact of climate change on polar bear populations, analyze the latest advancements in renewable energy technologies"]
-     }
+  "name": "Deep Research Agent",
+  "description": "Conducts comprehensive research on a given topic, utilizing web research and detailed analysis of the information found.",
+  "url": "http://localhost:10105/",
+  "preferredTransport": "HTTP+JSON",
+  "protocolVersion": "1.0",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": [
+    "text",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "deep_research",
+      "name": "Deep Researcher",
+      "description": "Conducts comprehensive research on a given topic, utilizing web research and detailed analysis of the information found.",
+      "tags": [
+        "deep research"
+      ],
+      "examples": [
+        "Research the impact of climate change on polar bear populations, analyze the latest advancements in renewable energy technologies"
+      ]
+    }
   ]
 }

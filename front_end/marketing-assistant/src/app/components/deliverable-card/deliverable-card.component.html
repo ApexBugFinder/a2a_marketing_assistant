@@ -1,0 +1,134 @@
+<mat-card class="deliverable-card" [class.readonly]="readonly">
+
+  <!-- Header -->
+  <mat-card-header>
+    <mat-card-title>
+      @if (type === 'blog') { {{ asBlog.title }} }
+      @if (type === 'linkedin') { LinkedIn Post }
+    </mat-card-title>
+    <mat-card-subtitle>
+      <span class="status-chip" [class]="statusClass">{{ statusLabel }}</span>
+      <span class="created-at">{{ item.created_at | date:'medium' }}</span>
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+
+    <!-- Blog Content -->
+    @if (type === 'blog') {
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>Content Preview</mat-panel-title>
+        </mat-expansion-panel-header>
+        <div class="content-preview" [innerHTML]="asBlog.content"></div>
+      </mat-expansion-panel>
+
+      @if (asBlog.seo_keywords) {
+        <div class="meta-row">
+          <mat-icon>label</mat-icon>
+          <span><strong>SEO Keywords:</strong> {{ asBlog.seo_keywords }}</span>
+        </div>
+      }
+      @if (asBlog.blog_url) {
+        <div class="meta-row">
+          <mat-icon>link</mat-icon>
+          <a [href]="asBlog.blog_url" target="_blank">View Published Post</a>
+        </div>
+      }
+    }
+
+    <!-- LinkedIn Content -->
+    @if (type === 'linkedin') {
+      <div class="linkedin-text">{{ asLinkedIn.text }}</div>
+      @if (asLinkedIn.hashtags.length > 0) {
+        <div class="hashtags">
+          @for (tag of asLinkedIn.hashtags; track tag) {
+            <mat-chip>{{ tag }}</mat-chip>
+          }
+        </div>
+      }
+      @if (asLinkedIn.image_url) {
+        <div class="meta-row">
+          <mat-icon>image</mat-icon>
+          <a [href]="asLinkedIn.image_url" target="_blank">View Image</a>
+        </div>
+      }
+      <div class="meta-row">
+        <mat-icon>{{ asLinkedIn.posted ? 'check_circle' : 'schedule' }}</mat-icon>
+        <span>{{ asLinkedIn.posted ? 'Posted to LinkedIn' : 'Not yet posted' }}</span>
+      </div>
+      @if (asLinkedIn.post_removed) {
+        <div class="meta-row">
+          <mat-icon color="warn">delete</mat-icon>
+          <span>Post removed</span>
+        </div>
+      }
+    }
+
+    <mat-divider></mat-divider>
+
+    <!-- AI Review -->
+    @if (item.ai_review_score !== undefined || item.ai_feedback) {
+      <div class="review-section">
+        <h4><mat-icon>smart_toy</mat-icon> AI Review</h4>
+        @if (item.ai_review_score !== undefined) {
+          <div class="score-row">
+            <span>Score:</span>
+            <span class="score"
+              [class.score-high]="item.ai_review_score >= 7"
+              [class.score-mid]="item.ai_review_score >= 4 && item.ai_review_score < 7"
+              [class.score-low]="item.ai_review_score < 4">
+              {{ item.ai_review_score }}/10
+            </span>
+          </div>
+        }
+        @if (item.ai_feedback) {
+          <p class="ai-feedback">{{ item.ai_feedback }}</p>
+        }
+      </div>
+      <mat-divider></mat-divider>
+    }
+
+    <!-- User Feedback (readonly history view) -->
+    @if (readonly && item.user_feedback) {
+      <div class="review-section">
+        <h4><mat-icon>person</mat-icon> Your Feedback</h4>
+        <p>{{ item.user_feedback }}</p>
+        @if (item.user_approved !== undefined) {
+          <div class="approved-badge">
+            <mat-icon [color]="item.user_approved ? 'primary' : 'warn'">
+              {{ item.user_approved ? 'thumb_up' : 'thumb_down' }}
+            </mat-icon>
+            <span>{{ item.user_approved ? 'Approved' : 'Rejected' }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Feedback Form (review mode) -->
+    @if (!readonly) {
+      <div class="feedback-form">
+        <h4><mat-icon>rate_review</mat-icon> Your Review</h4>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Feedback</mat-label>
+          <textarea matInput [(ngModel)]="feedbackText" rows="3"
+            placeholder="Add your notes or feedback about this deliverable..."></textarea>
+        </mat-form-field>
+      </div>
+    }
+
+  </mat-card-content>
+
+  <!-- Actions (review mode only) -->
+  @if (!readonly) {
+    <mat-card-actions align="end">
+      <button mat-stroked-button color="warn" (click)="reject()" [disabled]="submitting">
+        <mat-icon>thumb_down</mat-icon> Reject
+      </button>
+      <button mat-raised-button color="primary" (click)="approve()" [disabled]="submitting">
+        <mat-icon>thumb_up</mat-icon> Approve
+      </button>
+    </mat-card-actions>
+  }
+
+</mat-card>

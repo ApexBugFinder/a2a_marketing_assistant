@@ -1,23 +1,35 @@
 {
   "name": "SEO Blog Writer Agent",
-  "description": "Generates SEO-optimized blog posts based on user input, utilizing advanced natural language processing techniques and content optimization.",
-  "url": "http://localhost:10101/",
+  "description": "Generates SEO-optimized blog creation based on deep research content, utilizing advanced natural language processing techniques and content optimization.",
+  "url": "http://localhost:10117/",
+  "preferredTransport": "HTTP+JSON",
+  "protocolVersion": "1.0",
   "version": "1.0.0",
   "capabilities": {
     "streaming": true,
     "pushNotifications": true,
     "stateTransitionHistory": false
   },
-  "defaultInputModes": ["text", "text/plain"],
-  "defaultOutputModes": ["text", "text/plain"],
+  "defaultInputModes": [
+    "text",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text",
+    "text/plain"
+  ],
   "skills": [
     {
-      "id": "executor",
+      "id": "blog_writer",
       "name": "SEO Blog Writer",
-      "description": "Generates SEO-optimized blog posts based on user input.",
-      "tags": ["SEO", "blog writing", "content creation"],
+      "description": "Generates SEO-optimized blog creation based on user input.",
+      "tags": [
+        "SEO",
+        "blog writing",
+        "content creation"
+      ],
       "examples": [
-        "Write an SEO-optimized blog post about the latest trends in AI, Generate an SEO-friendly blog post announcing our company's new product launch"
+        "Write an SEO-optimized blog creation about the latest trends in AI"
       ]
     }
   ]

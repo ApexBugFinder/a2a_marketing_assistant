@@ -51,4 +51,5 @@ FROM UNNEST(
   keywords_and_key_aspects TEXT,
   research_cycle_count INTEGER,
   query TEXT
-);
+)
+RETURNING *;

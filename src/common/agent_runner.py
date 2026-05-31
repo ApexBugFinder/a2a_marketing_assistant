@@ -1,3 +1,7 @@
+import asyncio
+import json
+import logging
+import re
 import uuid
 from collections.abc import AsyncGenerator
 from google.adk.agents import Agent
@@ -8,16 +12,79 @@ from google.genai import types
 from dotenv import load_dotenv
 import os
 
-### TODO Refactor this to accept PostgresSaver
+_RETRYABLE_CODES = ('429', 'RESOURCE_EXHAUSTED', 'quota', 'rate limit', 'rateLimitExceeded')
+_DEFAULT_RETRY_DELAY = 30  # seconds — used only when the API doesn't tell us how long to wait
+
+def _is_rate_limit(exc: Exception) -> bool:
+     msg = str(exc).lower()
+     return any(code.lower() in msg for code in _RETRYABLE_CODES)
+
+def _parse_retry_after(exc: Exception) -> int:
+     """Extract the retry delay (seconds) from a rate-limit exception.
+
+     Priority:
+     1. retryDelay field in the JSON error body  (e.g. 'retryDelay': '47s')
+     2. Retry-After HTTP header value embedded in the exception string
+     3. Fall back to _DEFAULT_RETRY_DELAY
+     """
+     exc_str = str(exc)
+
+     # 1. Google API JSON body: {"details": [{"retryDelay": "47s"}]} or 'retryDelay': '47s'
+     m = re.search(r'retryDelay[\'"\s:]+(\d+)s', exc_str, re.IGNORECASE)
+     if m:
+          return int(m.group(1))
+
+     # 2. Try to parse a JSON blob embedded in the exception string
+     json_match = re.search(r'\{.*\}', exc_str, re.DOTALL)
+     if json_match:
+          try:
+               body = json.loads(json_match.group())
+               # Walk details list looking for RetryInfo
+               for detail in body.get('error', {}).get('details', []):
+                    delay_str = detail.get('retryDelay', '')
+                    digits = re.match(r'(\d+)', delay_str)
+                    if digits:
+                         return int(digits.group(1))
+          except (json.JSONDecodeError, AttributeError):
+               pass
+
+     # 3. Retry-After header value (numeric seconds)
+     m = re.search(r'retry.after[\'"\s:]+(\d+)', exc_str, re.IGNORECASE)
+     if m:
+          return int(m.group(1))
+
+     # 4. Any bare "wait N seconds" phrasing
+     m = re.search(r'wait\s+(\d+)\s+second', exc_str, re.IGNORECASE)
+     if m:
+          return int(m.group(1))
+
+     return _DEFAULT_RETRY_DELAY
+
+logger = logging.getLogger(__name__)
+
+
+def _build_session_service():
+    """Use PostgresSessionService when DB_URI is set, otherwise fall back to in-memory."""
+    db_uri = os.getenv("DB_URI")
+    if db_uri:
+        try:
+            from common.postgres_session_service import PostgresSessionService
+            logger.info("AgentRunner: using PostgresSessionService for conversation persistence")
+            return PostgresSessionService(db_uri=db_uri)
+        except Exception as exc:
+            logger.warning("PostgresSessionService unavailable (%s); falling back to InMemorySessionService", exc)
+    return InMemorySessionService()
+
+
 class AgentRunner:
      """Manges the exectution of tan ADK (Agent Development Kit) Agent.
      This class encapsulates teh logic for running an agent, handling session
      management (creation and retrieval), and streaming responses back to the caller.
-     It uses an in-memory session service."""
+     Uses PostgresSessionService when DB_URI is set, InMemorySessionService otherwise."""
 
      def __init__(self, user_id: str = 'user_1',
                     app_name: str = os.getenv('APP_NAME', 'chatbot_a2a_marketing_assistant')):
-          self.session_service = InMemorySessionService()
+          self.session_service = _build_session_service()
           self.session = None
           self.app_name = app_name
           self.user_id = user_id
@@ -56,32 +123,115 @@ class AgentRunner:
                parts=[types.Part(text=query)]
           )
 
-          async for event in runner.run_async(
-               user_id = self.user_id,
-               session_id = self.session.id,
-               new_message = content,
-          ):
-               if (
-                    event.content and
-                    event.content.parts and
-                    event.content.parts[0].text
-               ):
-                    response ='\n'.join(
-                         [p.text for p in event.content.parts if p.text]
+          # Drain the ADK generator fully before yielding final results.
+          # This prevents GeneratorExit from propagating into ADK's OTel-wrapped
+          # generators when the consumer breaks early ("Failed to detach context").
+          #
+          # For every ADK event we also yield a lightweight working signal so the
+          # upstream A2A HTTP connection stays alive during long tool-call chains.
+          # Without this, long deep-research tasks produce no output for minutes and
+          # the client's TCP/HTTP connection times out, showing "network error" even
+          # though the task completes server-side.
+          logger.info('[%s] began thinking — session=%s', agent.name, self.session.id)
+          # last_text holds the most-recent text turn. Earlier text turns are
+          # streamed immediately as 'streaming_text' (status updates / questions
+          # the agent sends mid-task). Only the final text turn becomes
+          # 'final_result' so the executor knows the task is done.
+          max_retries = 4
+          max_tool_calls = 30  # hard cap to prevent infinite tool-calling loops
+
+          for attempt in range(max_retries):
+               last_text: str | None = None
+               data_result = None
+               rate_limited = False
+               tool_call_count = 0
+
+               adk_gen = runner.run_async(
+                    user_id = self.user_id,
+                    session_id = self.session.id,
+                    new_message = content,
+               )
+               try:
+                    async for event in adk_gen:
+                         if not event.content or not event.content.parts:
+                              yield {'type': 'working', 'agent_name': agent.name}
+                              continue
+
+                         parts = event.content.parts
+
+                         if any(p.function_call for p in parts):
+                              tool_call_count += 1
+                              if tool_call_count > max_tool_calls:
+                                   logger.error(
+                                        '[%s] exceeded max tool calls (%d) — aborting to prevent infinite loop',
+                                        agent.name, max_tool_calls,
+                                   )
+                                   await adk_gen.aclose()
+                                   raise RuntimeError(
+                                        f'{agent.name}: exceeded max tool calls ({max_tool_calls}). '
+                                        'The agent may be stuck in a loop. Please try a more specific query.'
+                                   )
+                              tool_names = [p.function_call.name for p in parts if p.function_call]
+                              logger.info('[%s] calling tool(s) (%d/%d): %s',
+                                          agent.name, tool_call_count, max_tool_calls,
+                                          ', '.join(tool_names))
+
+                         elif any(p.function_response for p in parts):
+                              tool_names = [p.function_response.name for p in parts if p.function_response]
+                              logger.info('[%s] received tool result(s): %s', agent.name, ', '.join(tool_names))
+                              data_result = next(
+                                   (p.function_response.model_dump()
+                                    for p in parts
+                                    if p.function_response),
+                                   None,
+                              )
+
+                         elif any(p.text for p in parts):
+                              response = '\n'.join(p.text for p in parts if p.text)
+                              logger.info('[%s] text turn (%d chars)', agent.name, len(response))
+                              # Flush the previous text turn as a streaming status update
+                              # so the user sees it immediately, before the task completes.
+                              if last_text is not None:
+                                   yield {'type': 'streaming_text', 'response': last_text, 'agent_name': agent.name}
+                              last_text = response
+
+                         # Heartbeat so the upstream streaming connection stays alive.
+                         yield {'type': 'working', 'agent_name': agent.name}
+
+               except GeneratorExit:
+                    # Consumer broke out early (task complete, client disconnect, etc.).
+                    # Explicitly close the ADK generator so its OTel context is detached
+                    # cleanly instead of raising "Failed to detach context" on GC.
+                    await adk_gen.aclose()
+                    return
+
+               except Exception as exc:
+                    if _is_rate_limit(exc) and attempt < max_retries - 1:
+                         delay = _parse_retry_after(exc)
+                         logger.warning(
+                              '[%s] rate-limited (attempt %d/%d) — retrying in %ds. Error: %s',
+                              agent.name, attempt + 1, max_retries, delay, exc,
                          )
-               elif (event.content  and
-                    event.content.parts and
-                    any(True for p in event.content.parts if p.function_response)
-                    ):
-                    response = next(
-                         p.function_response.model_dump()
-                         for p in event.content.parts )
-               else:
-                    response = f"Error in running agent: {agent.name}"
-               yield {
-                    'type': 'final_result',
-                    'response': response
-               }
+                         yield {
+                              'type': 'streaming_text',
+                              'response': f'Rate limit reached — waiting {delay}s before retrying (attempt {attempt + 1}/{max_retries})...',
+                              'agent_name': agent.name,
+                         }
+                         await asyncio.sleep(delay)
+                         rate_limited = True
+                    else:
+                         raise
+
+               if not rate_limited:
+                    break  # completed without a rate-limit error
+
+          logger.info('[%s] finished — last_text=%s data_result=%s',
+                      agent.name, bool(last_text), bool(data_result))
+
+          if last_text is not None:
+               yield {'type': 'final_result', 'response': last_text}
+          elif data_result is not None:
+               yield {'type': 'final_result', 'response': data_result}
           else:
                yield {
                     'is_task_complete': False,

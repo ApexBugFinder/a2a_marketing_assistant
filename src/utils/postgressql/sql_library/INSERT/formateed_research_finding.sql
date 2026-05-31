@@ -1,2 +1,3 @@
-INSERT INTO "public".formatted_research_findings(id, research_project_id, title, author, publication_date, source, finding_summary, relevance_to_research_topic, source_url, keywords_and_key_aspects, research_cycle_count, query)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+INSERT INTO "public".formatted_research_findings(id, research_project_id, title, author, publication_date, source, relevance_to_research_topic, source_url, keywords_and_key_aspects, research_cycle_count, query)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING *;

@@ -1,0 +1,42 @@
+@if (shellVisible()) {
+  <mat-sidenav-container class="app-container">
+
+    <mat-sidenav mode="side" opened class="sidenav">
+      <div class="brand">
+        <span class="brand-mark">in</span>
+        <span class="brand-text">Marketing<br>Assistant</span>
+      </div>
+
+      <mat-nav-list>
+        @for (item of navItems; track item.route) {
+          <a mat-list-item [routerLink]="item.route" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+      </mat-nav-list>
+
+      <div class="sidenav-spacer"></div>
+
+      @if (user$ | async; as user) {
+        <div class="user-chip">
+          <span class="avatar">{{ initial(user.name) }}</span>
+          <div class="user-meta">
+            <span class="user-name">{{ user.name }}</span>
+            <span class="user-email">{{ user.email }}</span>
+          </div>
+          <button mat-icon-button class="logout-btn" (click)="logout()" aria-label="Log out">
+            <mat-icon>logout</mat-icon>
+          </button>
+        </div>
+      }
+    </mat-sidenav>
+
+    <mat-sidenav-content class="main-content">
+      <router-outlet />
+    </mat-sidenav-content>
+
+  </mat-sidenav-container>
+} @else {
+  <router-outlet />
+}

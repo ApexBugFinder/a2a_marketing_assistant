@@ -1,2 +1,3 @@
-INSERT INTO "public".blog_content(id, research_project_id, title, content, seo_keywords, blog_status, publication_date, blog_url, keywords_and_key_aspects, created_at)
-VALUES (gen_random_uuid(), 'research_project_id_value', 'title_value', 'content_value', 'seo_keywords_value', 'blog_status_value', 'publication_date_value', 'blog_url_value', 'keywords_and_key_aspects_value', CURRENT_TIMESTAMP);
+INSERT INTO "public".blog_content (id, research_project_id, title, content, seo_keywords, publication_date, keywords_and_key_aspects, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB))
+RETURNING *;

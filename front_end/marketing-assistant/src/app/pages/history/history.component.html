@@ -1,0 +1,78 @@
+<div class="page-container">
+
+  <div class="page-header">
+    <h1><mat-icon>history</mat-icon> Deliverables History</h1>
+
+    <div class="filters">
+      <mat-form-field appearance="outline" class="project-select">
+        <mat-label>Research Project</mat-label>
+        <mat-select [(ngModel)]="selectedProjectId" (ngModelChange)="onProjectChange()">
+          @for (p of projects; track p.id) {
+            <mat-option [value]="p.id">{{ p.name || p.query }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-button-toggle-group [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()" aria-label="Status filter">
+        <mat-button-toggle value="all">All</mat-button-toggle>
+        <mat-button-toggle value="approved">
+          <mat-icon>thumb_up</mat-icon> Approved
+        </mat-button-toggle>
+        <mat-button-toggle value="rejected">
+          <mat-icon>thumb_down</mat-icon> Rejected
+        </mat-button-toggle>
+        <mat-button-toggle value="posted">
+          <mat-icon>check_circle</mat-icon> Posted
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+  </div>
+
+  @if (loading) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
+
+  <mat-tab-group animationDuration="200ms">
+
+    <!-- Blog History -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>article</mat-icon>&nbsp;Blog Posts
+        <span class="count-badge">{{ filteredBlogs.length }}</span>
+      </ng-template>
+
+      <div class="tab-content">
+        @if (filteredBlogs.length === 0 && !loading) {
+          <div class="empty-state">
+            <mat-icon>inbox</mat-icon>
+            <p>No blog posts match the current filter.</p>
+          </div>
+        }
+        @for (post of filteredBlogs; track post.id) {
+          <app-deliverable-card [item]="post" type="blog" [readonly]="true"></app-deliverable-card>
+        }
+      </div>
+    </mat-tab>
+
+    <!-- LinkedIn History -->
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon>linkedin</mat-icon>&nbsp;LinkedIn Posts
+        <span class="count-badge">{{ filteredLinkedIn.length }}</span>
+      </ng-template>
+
+      <div class="tab-content">
+        @if (filteredLinkedIn.length === 0 && !loading) {
+          <div class="empty-state">
+            <mat-icon>inbox</mat-icon>
+            <p>No LinkedIn posts match the current filter.</p>
+          </div>
+        }
+        @for (post of filteredLinkedIn; track post.id) {
+          <app-deliverable-card [item]="post" type="linkedin" [readonly]="true"></app-deliverable-card>
+        }
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

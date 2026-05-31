@@ -6,5 +6,9 @@ CREATE TABLE IF NOT EXISTS "public"."marketing_images" (
      image_url TEXT NOT NULL,
      tiny_url TEXT,
      description TEXT,
-     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-     );
+     size_bytes INTEGER,
+     img_dimensions TEXT,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     saved_to_s3_at TIMESTAMP,
+     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

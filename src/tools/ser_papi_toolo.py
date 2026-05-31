@@ -2,7 +2,7 @@ import os
 
 from langchain.tools import tool
 from langsmith import traceable
-
+import requests
 from config.serpapi_main_topic_config import Config as MainTopicConfig
 from config.serpapi_key_aspect_config import Config as KeyAspectConfig
 import serpapi
@@ -14,7 +14,11 @@ from pydantic import BaseModel, Field
 class _QueryInput(BaseModel):
      query: str = Field(description="The search query to retrieve from the serpapi search tool")
 
-class _SerpapiOutput(BaseModel):
+class SerpapiInput(BaseModel):
+     query: str = Field(description="The search query to retrieve from the serpapi search tool")
+     research_project_id: str = Field(description="The unique identifier for the research project")
+class FormattedSerpapiWebSearchResults(BaseModel):
+     research_project_id: str|None = Field(description="the unique identifier for the research project")
      title: str | None = Field(description="The title of the search result", default=None)
      link: str | None = Field(description="The link to the search result", default=None)
      source: str | None = Field(description="The source of the search result", default=None)
@@ -22,16 +26,18 @@ class _SerpapiOutput(BaseModel):
      position: int | None = Field(description="The position of the search result in the search results page", default=None)
      snippet: str | None = Field(description="The snippet of the search result", default=None)
 
-class SerpApiTool:
+class SerpApiTools:
      def __init__(self):
           self.main_topic_config = MainTopicConfig()
           self.key_aspect_config = KeyAspectConfig()
+          self. base_url = "https://api.semanticscholar.org/graph/v1"
+          self.bulk = "/paper/search/bulk"
           self.main_topic_searcher_tool = StructuredTool.from_function(
                func=self.serpapi_main_topic_search,
                name="SerpAPI Main Topic Search Tool",
                description="""A tool to perform a web search using the SerpAPI to retrieve relevant information
                and documents related to the research topic.""",
-               args_schema=_QueryInput,
+               args_schema=SerpapiInput,
                response_format='content'
                )
           self.key_aspect_searcher_tool = StructuredTool.from_function(
@@ -39,7 +45,7 @@ class SerpApiTool:
                name="SerpAPI Key Aspect Search Tool",
                description="""A tool to perform a web search using the SerpAPI to retrieve relevant information
                and documents related to a specific aspect of the research topic.""",
-               args_schema=_QueryInput,
+               args_schema=SerpapiInput,
 
                response_format='content'
 
@@ -47,7 +53,7 @@ class SerpApiTool:
 
      # @tool("SerpAPI Main Topic Search Tool", return_direct=True)
      @traceable(run_type='tool')
-     def serpapi_main_topic_search(self, query: str) -> dict:
+     def serpapi_main_topic_search(self, query: str, research_project_id: str) -> dict:
           """Useful for performing a web search using the SerpAPI to retrieve relevant information and documents related to the research topic."""
 
           client = serpapi.Client(api_key=self.main_topic_config.SERP_API_KEY)
@@ -66,11 +72,11 @@ class SerpApiTool:
 
 
 
-          return self.clean_results(results)
+          return self.clean_results(results, research_project_id)
 
      # @tool("SerpAPI Key Aspect Search Tool", return_direct=True)
      @traceable(run_type='tool')
-     def serpapi_key_aspect_search(self, query: str) :
+     def serpapi_key_aspect_search(self, query: str, research_project_id: str) :
           """Useful for performing a web search using the SerpAPI to retrieve relevant information and documents related to a specific aspect of the research topic."""
           client = serpapi.Client(api_key=self.key_aspect_config.SERP_API_KEY)
           params = {
@@ -86,20 +92,54 @@ class SerpApiTool:
           }
           results = client.search(params)
 
-          return self.clean_results(results)
+          return self.clean_results(results, research_project_id)
 
-     def clean_results(self, results: dict) -> list[_SerpapiOutput]:
+     def clean_results(self, results: dict, research_project_id: str) -> list[FormattedSerpapiWebSearchResults]:
           """A helper function to clean the results returned by the SerpAPI and extract the relevant information."""
-          cleaned_results = []
+          print(f'Research Project ID: {research_project_id}')
+          cleaned_results: list[FormattedSerpapiWebSearchResults] = []
           for result in results.get('organic_results', []):
-               record = {}
-               if 'link' in result:
-                    record['link'] = result['link'].split('&sa=U&')[0]
-               record['title'] = result.get('title', '')
-               record['source'] = result.get('source', '')
-               record['date'] = result.get('date', '')
-               record['position'] = result.get('position', '')
-               record['snippet'] = result.get('snippet', '')
+               if 'link' not in result:
+                    continue
+               raw_link = result['link']
+               if isinstance(raw_link, dict):
+                    link = next(
+                         (v.split('&sa=U&')[0] if v.startswith('/url?q=') else v
+                          for v in raw_link.values()
+                          if isinstance(v, str) and (v.startswith('http') or v.startswith('/url?q='))),
+                         None,
+                    )
+               elif raw_link.startswith('/url?q='):
+                    link = raw_link.split('&sa=U&')[0]
+               elif raw_link.startswith('http'):
+                    link = raw_link
+               else:
+                    continue
+               if not link:
+                    continue
+               record = FormattedSerpapiWebSearchResults(
+                    research_project_id=research_project_id,
+                    title=result.get('title', ''),
+                    link=link,
+                    source=result.get('source', ''),
+                    date=result.get('date', ''),
+                    position=result.get('position'),
+                    snippet=result.get('snippet', ''),
+               )
                cleaned_results.append(record)
 
           return cleaned_results
+
+     def searcher(self, query):
+          """A simple searcher function that can be used to perform a web search semantic scholar."""
+          url = f"{self.base_url}{self.bulk}"
+          query_params = {
+               "query": query,
+               "fields": "title, url, source, publicationDate, openAccessPdf",
+               "year": "1980-"
+          }
+
+          api_key = " s2k-7He1Tmbwc9RlvTlvIfR8eet87Qt31v67bVSYrFHc"
+          headers = {"x-api-key": api_key}
+          response = requests.get(url, params=query_params, headers=headers).json()
+          return response

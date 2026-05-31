@@ -4,19 +4,16 @@ from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
 
 from a2a.types import (
-     DataPart,
      InvalidParamsError,
-     SendStreamingMessageSuccessResponse,
+     StreamResponse,
      Task,
      TaskArtifactUpdateEvent,
      TaskState,
      TaskStatusUpdateEvent,
-     TextPart,
-     UnsupportedOperationError
+     UnsupportedOperationError,
      )
 
-from a2a.utils import new_agent_text_message, new_task
-from a2a.utils.errors import ServerError
+from a2a.helpers import new_task_from_user_message, new_text_message, new_text_part, new_data_part
 from common.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -36,70 +33,107 @@ class GenericAgentExecutor(AgentExecutor):
           logger.info(f"Executing agent {self.agent.agent_name} with request context: {request_context}")
           error = self._validate_input(request_context)
           if error:
-               raise ServerError(error=InvalidParamsError(message=error))
+               raise InvalidParamsError(message=error)
 
           query = request_context.get_user_input()
           logger.info(f"Agent {self.agent.agent_name} received query: {query}")
 
           task = request_context.current_task
           if not task:
-               task = new_task(request_context.message)
-               await event_queue.enqueue(task)
+               task = new_task_from_user_message(request_context.message)
+               await event_queue.enqueue_event(task)
 
           updater = TaskUpdater(event_queue, task.id, task.context_id)
 
-          async for item in self.agent.stream(query, task.context_id, task.id):
-               # Agent to Agent call will return events
-               # Update teh relevant ids to proxy back.
-               if hasattr(item, 'root')  and isinstance(item.root, SendStreamingMessageSuccessResponse):
-                    event = item.root.result
-                    if isinstance(event, (TaskStatusUpdateEvent | TaskArtifactUpdateEvent)):
-                         await event_queue.enqueue_event(event)
-                    continue
+          try:
+               async for item in self.agent.stream(query, task.context_id, task.id):
+                    # Sub-agent StreamResponse events carry the sub-agent's task ID,
+                    # not this task's ID. Re-stamp them via updater so TaskManager accepts them.
+                    if isinstance(item, StreamResponse):
+                         if item.HasField('status_update'):
+                              state = item.status_update.status.state
+                              if state == TaskState.TASK_STATE_INPUT_REQUIRED:
+                                   msg = None
+                                   if item.status_update.status.HasField('message'):
+                                        msg = item.status_update.status.message
+                                   await updater.update_status(
+                                        state=TaskState.TASK_STATE_INPUT_REQUIRED,
+                                        message=msg,
+                                   )
+                                   break
+                              elif state != TaskState.TASK_STATE_COMPLETED:
+                                   msg = None
+                                   if item.status_update.status.HasField('message'):
+                                        msg = item.status_update.status.message
+                                   await updater.update_status(
+                                        state=TaskState.TASK_STATE_WORKING,
+                                        message=msg,
+                                   )
+                         elif item.HasField('artifact_update'):
+                              artifact = item.artifact_update.artifact
+                              await updater.add_artifact(
+                                   parts=list(artifact.parts),
+                                   name=artifact.name,
+                              )
+                         continue
 
-               is_task_complete = item['is_task_complete']
-               require_user_input = item['require_user_input']
+                    is_task_complete = item['is_task_complete']
+                    require_user_input = item['require_user_input']
 
+                    if is_task_complete:
+                         if item['response_type'] == 'data':
+                              part = new_data_part(data=item['content'])
+                         else:
+                              part = new_text_part(text=item['content'])
 
-               if is_task_complete:
-                    if item['response_type'] == 'data':
-                         part = DataPart(data=item['content'])
-                    else:
-                         part = TextPart(text=item['content'])
+                         await updater.add_artifact(
+                              [part],
+                              name=f"{self.agent.agent_name}-result",
+                         )
+                         await updater.complete()
+                         break
+                    content = item['content']
+                    if not isinstance(content, str):
+                         content = str(content)
 
-                    await updater.add_artifact(
-                         [part],
-                         name=f"{self.agent.agent_name}-result",
-                    )
-                    await updater.complete()
-                    break
-               if require_user_input:
+                    if require_user_input:
+                         await updater.update_status(
+                              state=TaskState.TASK_STATE_INPUT_REQUIRED,
+                              message=new_text_message(
+                                   text=content,
+                                   context_id=task.context_id,
+                                   task_id=task.id,
+                              ),
+                         )
+                         break
                     await updater.update_status(
-                         status = TaskState.TASK_STATE_INPUT_REQUIRED,
-                         message= new_agent_text_message(
-                              item['content'],
-                              task.context_id,
-                              task.id
+                         state=TaskState.TASK_STATE_WORKING,
+                         message=new_text_message(
+                              text=content,
+                              context_id=task.context_id,
+                              task_id=task.id,
                          ),
-                         final=True
                     )
-                    break
-               await updater.update_status(
-                    status = TaskState.TASK_STATE_WORKING,
-                    message= new_agent_text_message(
-                         item['content'],
-                         task.context_id,
-                         task.id
-                    ),
-
+          except Exception as e:
+               error_msg = f"{type(e).__name__}: {e}"
+               logger.error(
+                    f"Agent '{self.agent.agent_name}' raised an unhandled exception: {error_msg}",
+                    exc_info=True,
                )
+               try:
+                    await updater.update_status(
+                         state=TaskState.TASK_STATE_FAILED,
+                         message=new_text_message(text=f"[{self.agent.agent_name}] FAILED — {error_msg}"),
+                    )
+               except Exception:
+                    raise e
+
      def _validate_input(self, request_context: RequestContext) -> bool:
           return False
 
      async def cancel(
           self,
-          request: RequestContext,
-          event_queue: EventQueue
-          )  -> Task| None:
-
-          raise ServerError(error=UnsupportedOperationError(message="Cancel operation is not supported for this agent"))
+          context: RequestContext,
+          event_queue: EventQueue,
+          ) -> None:
+          raise UnsupportedOperationError(message='Cancel operation is not supported for this agent')
