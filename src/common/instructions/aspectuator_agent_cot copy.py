@@ -34,6 +34,7 @@ TOOLS AVAILABLE:
      - [postgres_async_runner_tool] — primary tool for SQL queries. Call get_model_schema_tool first.
      - [postgres_sync_runner_tool] — fallback if the async tool is unavailable.
      - [get_model_schema_tool] — returns the schema and SQL templates for a database model.
+     - [get_pydantic_model_tool] - returns the schema for Pydantic models.
 
 ==========================================================================================================================
 
@@ -75,30 +76,30 @@ Agent Instructions:
 
 DECISION TREE:
 1. **Validate Input**
-   - Ensure `research_project_id` is provided and keywords/key aspects list is non‑empty.
-   - If missing, yield an error describing the missing information.
+     - Ensure `research_project_id` is provided and keywords/key aspects list is non‑empty.
+     - If missing, yield an error describing the missing information.
 2. **Download Required Data**
-   - Retrieve `research_project`, `generated_queries`, `keywords_or_key_aspects`, and `research_project_information` using the prescribed tools.
+     - Retrieve `research_project`, `generated_queries`, `keywords_or_key_aspects`, and `research_project_information` using the prescribed tools.
 3. **Query Pinecone**
-   - If no generated queries, send `original_query` to Pinecone.
-   - Otherwise, send each `generated_query` with status `verified` to Pinecone.
-   - Collect results into `pinecone_results` and mark processed queries as `searched`.
+     - If no generated queries, send `original_query` to Pinecone.
+     - Otherwise, send each `generated_query` with status `verified` to Pinecone.
+     - Collect results into `pinecone_results` and mark processed queries as `searched`.
 4. **Extract New Keywords/Key Aspects**
-   - Parse `pinecone_results` to extract fresh keywords/key aspects not already in the set.
-   - If none extracted, increment `bottom_count` in `research_project_information` and jump to Returns.
+     - Parse `pinecone_results` to extract fresh keywords/key aspects not already in the set.
+     - If none extracted, increment `bottom_count` in `research_project_information` and jump to Returns.
 5. **Generate Candidate Queries**
-   - For each new keyword/key aspect, identify its Research Framework category.
-   - Apply the corresponding template to craft candidate queries.
-   - Discard irrelevant or low‑value candidates.
+     - For each new keyword/key aspect, identify its Research Framework category.
+     - Apply the corresponding template to craft candidate queries.
+     - Discard irrelevant or low‑value candidates.
 6. **Deduplicate**
-   - Compare candidates against `previously_generated`.
-   - If all are duplicates, increment `bottom_count` and jump to Returns.
-   - Otherwise, mark unique candidates as `verified`.
+     - Compare candidates against `previously_generated`.
+     - If all are duplicates, increment `bottom_count` and jump to Returns.
+     - Otherwise, mark unique candidates as `verified`.
 7. **Save New Queries & Update Project Info**
-   - Insert verified queries into the database.
-   - Update `research_project_information` as needed.
+     - Insert verified queries into the database.
+     - Update `research_project_information` as needed.
 8. **Return Outcome**
-   - Follow the Returns section logic based on the final `bottom_count` versus `MAX_BOTTOM`.
+     - Follow the Returns section logic based on the final `bottom_count` versus `MAX_BOTTOM`.
 
 
 
@@ -201,7 +202,7 @@ RETURNS SECTION:
 
 DECISION TREE:
 
-1. If the bottom_count from `research_project_information` is less than `MAX_BOTTOM`, 
+1. If the bottom_count from `research_project_information` is less than `MAX_BOTTOM`,
 (if bottom_count is None or less than 0 go to step 3)
 yield {
      'response_type': 'data',
@@ -220,7 +221,7 @@ yield {
      }
 }
 
-2. The bottom_count from `research_project_information` is equal to or greater than  or equal to `MAX_BOTTOM`: 
+2. The bottom_count from `research_project_information` is equal to or greater than  or equal to `MAX_BOTTOM`:
 yield {
      'response_type': 'data',
      'is_task_complete': True,
@@ -241,7 +242,7 @@ yield {
           ],
      }
 
-3. The bottom_count from `research_project_information` is None or less than 0: 
+3. The bottom_count from `research_project_information` is None or less than 0:
 yield {
      'response_type': 'data',
      'is_task_complete': True,

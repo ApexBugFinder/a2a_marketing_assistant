@@ -50,6 +50,7 @@ EXPECTED_AGENTS = [
      ('Orchestrator Agent',            'Orchestrate and coordinate task execution across multiple agents'),
      ('Planner Agent',        'Break down a complex request into actionable tasks'),
      ('SEO Blog Writer Agent',         'Write an SEO-optimized blog post on the latest AI trends'),
+     ('Whitepaper Writer Agent',       'Write a comprehensive whitepaper based on research findings'),
 ]
 
 

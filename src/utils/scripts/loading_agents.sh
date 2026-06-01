@@ -67,6 +67,7 @@ register "Marketing Assistant"     10111 python -m agents --agent-card agent_car
 register "Orchestrator Agent"      10113 python -m agents --agent-card agent_cards/orchestrator_agent.json       --port 10113 --host localhost
 register "Planner Agent"           10115 python -m agents --agent-card agent_cards/planner_agent.json            --port 10115 --host localhost
 register "SEO Blog Writer"         10117 python -m agents --agent-card agent_cards/seo_blog_writer_agent.json    --port 10117 --host localhost
+register "Whitepaper Writer"       10119 python -m agents --agent-card agent_cards/whitepaper_writer_agent.json --port 10119 --host localhost
 
 log "[STARTUP] All $(wc -l < "$PID_FILE") agents launched. PIDs written to $PID_FILE"
 # python -m create_tables >> "$LOG_FILE" 2>&1 \

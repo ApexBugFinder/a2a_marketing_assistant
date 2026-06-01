@@ -79,8 +79,8 @@ returned SQL template string directly as the `query` argument to
 `postgres_async_runner_tool` — do NOT pass file paths.
 
 Available models: research_project, research_project_information,
-formatted_research_findings, generated_query, content_strategy,
-blog_content, linkedin_post, linkedin_account, marketing_image.
+research_finding, formatted_research_findings, generated_query,
+content_strategy, blog_content, linkedin_post, linkedin_account, marketing_image.
 
 General rules when working with database fields:
 - If a field value is a dict, convert it to a JSON string before passing as a TEXT parameter.
@@ -138,7 +138,7 @@ Process:
 Read and understand all data structures above before beginning. Follow this step-by-step process.
 
 
-1. Understand the Research Topic
+1.   Understand the Research Topic
 
      - Use the tool: [postgres_async_runner_tool] to query the 'research_projects' table.
           Call `get_model_schema_tool('research_project')` first, then use the `read_by_id` SQL
@@ -160,8 +160,8 @@ Read and understand all data structures above before beginning. Follow this step
      }
 
 
-2. Check using the postgres_async_runner_tool if Research Project Information exists with a matching 'research_project_id' in the database.  If so retrieve and save  object as `research_project_information`.
-If not, initialize Research Project Information.
+2.   Check using the postgres_async_runner_tool if Research Project Information exists with a matching 'research_project_id' in the database.  If so retrieve and save  object as `research_project_information`.
+     If not, initialize Research Project Information.
      - Retrieve the research project data from step 1 (query, name, description).
      - Call `get_model_schema_tool('research_project_information')` to get the INSERT SQL.
      - Build the INSERT with these values:
@@ -181,17 +181,17 @@ If not, initialize Research Project Information.
      - Proceed immediately to step 3 (Research & Data Collection).
 
 
-3. Download Generated Queries for the database:
+3.   Download Generated Queries for the database:
      - Call `get_model_schema_tool('generated_query')` to get the read_by_research_project_id SQL template.
      - Use postgres_async_runner_tool to run the query with the research_project_id and fetch all results.
      - Save the list of generated queries, if any, as `generated_queries` else an empty list.
 
-4. Download Research Finding  from the database:
+4.   Download Research Finding  from the database:
      - Call `get_model_schema_tool('formatted_research_findings')` to get the read_by_research_project_id SQL template.
      - Use postgres_async_runner_tool to run the query with the research_project_id and fetch all results.
      - Save the list of research findings, if any, as `research_findings` else an empty list.
 
-5. Set 'BOTTOM'
+5.   Set 'BOTTOM'
      - If there are no generated queries, set 'BOTTOM' = False and proceed to step 6.
      - If there are generated queries and the most recent cycle's generated queries have all been marked as 'status' = 'searched', set 'BOTTOM'= True.
           *    This means the Aspectuator Agent has not been able to generate any new queries that are useful for further research,
@@ -209,17 +209,18 @@ If not, initialize Research Project Information.
 
 
 
-8.  If 'new_research_findings' is not empty, send the urls to [pinecone_scrape_and_push_tool] to scrape the content and push to Pinecone.
+8.   If 'new_research_findings' is not empty, send to [pinecone_scrape_and_push_tool] to scrape the content and push to Pinecone.
      - If 'new_research_findings' is empty, set 'BOTTOM' = True and skip to step 7
      - Before sending the URLs, check the count of incoming URLs and compare to the [total_articles_processed] so far.
      If processing all the incoming URLs would put you over the hard cap of 'max_articles'
 
-9. Save 'new_research_findings' to database
+9.   Save 'new_research_findings' to database
      - Call `get_model_schema_tool('research_finding')` to get the INSERT batch SQL.
      - Build the INSERT(batch) with these values:
           * id: array of NULL (auto-generate)
           * research_project_id: and array of the UUID from your task input 'research_project_id'
           * source: array of the source values from 'new_research_findings'
+          * author: array of the author values from 'new_research_findings'
           * pub_date: array of the publication dates from 'new_research_findings'
           * title: array of the titles from 'new_research_findings'
           * url: array of the URLs from 'new_research_findings'
@@ -227,14 +228,14 @@ If not, initialize Research Project Information.
      - Use postgres_async_runner_tool with the batch_insert   template and fetch=False.
 
 
-10. If new_research_findings is not empty, update the total_articles_processed count.
+10.  If new_research_findings is not empty, update the total_articles_processed count.
      - If total_articles_processed reaches 'max_articles', set 'BOTTOM' = True
 
-IF 'BOTTOM' is True the data collection is complete and it is time to analyze and write papers with the WhiteWriter Agent.  Pass the 'research_project_id'
-IF 'BOTTOM' is False increase the 'research_cycle_count' in the research_project_information by 1, and update the database with new value
-     - Call 'get_model_schema_tool('research_project') to get the UPDATE SQL
-     - Build the UPDATE with these values:
-          * research_cycle_count: the updated count value
+11.  If 'BOTTOM' is True the data collection is complete and it is time to analyze and write papers with the WhiteWriter Agent.  Pass the 'research_project_id'
+     - If 'BOTTOM' is False increase the 'research_cycle_count' in the research_project_information by 1, and update the database with new value
+          - Call 'get_model_schema_tool('research_project') to get the UPDATE SQL
+          - Build the UPDATE with these values:
+               * research_cycle_count: the updated count value
           - Use postgres_async_runner_tool with the UPDATE template and fetch=False.
 
 
@@ -242,7 +243,7 @@ MAINTENANCE MODE:
 ======================
 After completing the research report and summary, you will enter maintenance mode where you monitor for
 new information on the research topic and update deliverables as needed.
-- Redo the research loop (steps 3a–3f) using the original or evolved queries.
-- Only update the database if the search results contain information not already captured.
-- Update the Formatted Research Findings, Research Report, and Research Summary with any new findings.
+     - Redo the research loop (steps 3a–3f) using the original or evolved queries.
+     - Only update the database if the search results contain information not already captured.
+     - Update the Formatted Research Findings, Research Report, and Research Summary with any new findings.
 """

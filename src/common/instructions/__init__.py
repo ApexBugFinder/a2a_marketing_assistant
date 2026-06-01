@@ -6,6 +6,7 @@ from .linkedin_post_generator_agent_cot import LINKEDIN_POSTER_COT_INSTRUCTION
 from .marketing_assistant_agent_cot import MARKETING_ASSISTANT_AGENT_COT_INSTRUCTION
 from .planner_agent_cot import PLANNER_AGENT_COT_INSTRUCTION
 from .seo_blog_writer_agent_cot import SEO_BLOG_WRITER_AGENT_COT_INSTRUCTIONS
+from .whitepaper_writer_agent import WHITEPAPER_WRITER_AGENT_COT_INSTRUCTIONS
 
 # Provide a clear, concise summary of what was accomplished, key findings, and any deliverables created.
 SUMMARY_COT_PROMPT = """You are a marketing assistant summarizing the results of a completed multi-agent workflow.

@@ -124,6 +124,15 @@ def create_id_tool() -> uuid.UUID:
      return uuid.uuid4()
 
 @mcp.tool()
+def create_multiple_uuid_tool(num: int) -> list[str]:
+     """Create multiple UUID4s at once. Pass `num` (positive integer) to get
+     that many UUID strings back. Useful when batch-inserting records that each
+     need their own ID — avoids calling create_id_tool in a loop."""
+     if num < 1:
+          return []
+     return [str(uuid.uuid4()) for _ in range(num)]
+
+@mcp.tool()
 def get_model_schema_tool(model_name: str) -> dict:
      """Return the full database schema, field descriptions, and parameter-by-parameter
      SQL templates for a given model. Call this BEFORE running any SQL against a table

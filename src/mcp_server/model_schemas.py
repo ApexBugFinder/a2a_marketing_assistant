@@ -195,6 +195,8 @@ MODEL_SCHEMAS: dict[str, dict[str, Any]] = {
             "description": "Foreign key to research_projects.id."},
             {"name": "source", "type": "text", "pg_type": "TEXT", "pg_nullable": True,
             "description": "Source / publication name or platform."},
+            {"name": "author", "type": "text", "pg_type": "TEXT", "pg_nullable": True,
+            "description": "Author name(s)."},
             {"name": "pub_date", "type": "text", "pg_type": "TEXT", "pg_nullable": True,
             "description": "Publication date as a string."},
             {"name": "title", "type": "text", "pg_type": "TEXT", "pg_nullable": True,
@@ -221,32 +223,34 @@ MODEL_SCHEMAS: dict[str, dict[str, Any]] = {
             ),
             "insert": (
                 "INSERT INTO public.research_findings "
-                "(id, research_project_id, source, pub_date, title, url, research_cycle_count) "
-                "VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7) RETURNING *",
+                "(id, research_project_id, source, author, pub_date, title, url, research_cycle_count) "
+                "VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8) RETURNING *",
                 [
                     {"$1": "id (UUID, NULL=gen_random_uuid())"},
                     {"$2": "research_project_id (UUID)"},
                     {"$3": "source (TEXT)"},
-                    {"$4": "pub_date (TEXT)"},
-                    {"$5": "title (TEXT)"},
-                    {"$6": "url (TEXT)"},
-                    {"$7": "research_cycle_count (INTEGER)"},
+                    {"$4": "author (TEXT)"},
+                    {"$5": "pub_date (TEXT)"},
+                    {"$6": "title (TEXT)"},
+                    {"$7": "url (TEXT)"},
+                    {"$8": "research_cycle_count (INTEGER)"},
                 ],
             ),
             "batch_insert": (
                 "INSERT INTO public.research_findings "
-                "(id, research_project_id, source, pub_date, title, url, research_cycle_count) "
+                "(id, research_project_id, source, author, pub_date, title, url, research_cycle_count) "
                 "SELECT * FROM UNNEST($1::UUID[], $2::UUID[], $3::TEXT[], $4::TEXT[], "
-                "$5::TEXT[], $6::TEXT[], $7::INTEGER[]) "
-                "AS t(id, research_project_id, source, pub_date, title, url, research_cycle_count) RETURNING *",
+                "$5::TEXT[], $6::TEXT[], $7::TEXT[], $8::INTEGER[]) "
+                "AS t(id, research_project_id, source, author, pub_date, title, url, research_cycle_count) RETURNING *",
                 [
                     {"$1": "id[] (UUID array)"},
                     {"$2": "research_project_id[] (UUID array)"},
                     {"$3": "source[] (TEXT array)"},
-                    {"$4": "pub_date[] (TEXT array)"},
-                    {"$5": "title[] (TEXT array)"},
-                    {"$6": "url[] (TEXT array)"},
-                    {"$7": "research_cycle_count[] (INTEGER array)"},
+                    {"$4": "author[] (TEXT array)"},
+                    {"$5": "pub_date[] (TEXT array)"},
+                    {"$6": "title[] (TEXT array)"},
+                    {"$7": "url[] (TEXT array)"},
+                    {"$8": "research_cycle_count[] (INTEGER array)"},
                 ],
             ),
             "delete": (
@@ -896,6 +900,28 @@ MODEL_SCHEMAS: dict[str, dict[str, Any]] = {
                     {"$9": "saved_to_s3_at (TIMESTAMP)"},
                 ],
             ),
+            "batch_insert": (
+                "INSERT INTO public.marketing_images "
+                "(id, research_project_id, image_url, tiny_url, description, "
+                "size_bytes, img_dimensions, created_at, saved_to_s3_at) "
+                "SELECT id, research_project_id, image_url, tiny_url, description, "
+                "size_bytes, img_dimensions, created_at, saved_to_s3_at "
+                "FROM UNNEST($1::UUID[], $2::UUID[], $3::TEXT[], $4::TEXT[], $5::TEXT[], "
+                "$6::INTEGER[], $7::TEXT[], $8::TIMESTAMP[], $9::TIMESTAMP[]) "
+                "AS t(id, research_project_id, image_url, tiny_url, description, "
+                "size_bytes, img_dimensions, created_at, saved_to_s3_at) RETURNING *",
+                [
+                    {"$1": "id[] (UUID array)"},
+                    {"$2": "research_project_id[] (UUID array)"},
+                    {"$3": "image_url[] (TEXT array)"},
+                    {"$4": "tiny_url[] (TEXT array, NULL for no tiny URL)"},
+                    {"$5": "description[] (TEXT array)"},
+                    {"$6": "size_bytes[] (INTEGER array)"},
+                    {"$7": "img_dimensions[] (TEXT array — e.g. '1024x1024')"},
+                    {"$8": "created_at[] (TIMESTAMP array)"},
+                    {"$9": "saved_to_s3_at[] (TIMESTAMP array)"},
+                ],
+            ),
             "update": (
                 "UPDATE public.marketing_images "
                 "SET image_url=$2, tiny_url=$3, description=$4, size_bytes=$5, "
@@ -1076,20 +1102,47 @@ class ResearchProject(BaseModel):
 
 # ── Research Project Information ────────────────────────────────────────────
 
+class ReportReviewCriteria(BaseModel):
+    """Reusable AI + user review criteria for any deliverable.
+
+    Included as a nested ``review_criteria`` field on ReportInfoMetadata,
+    SummaryInfoMetadata, and any future deliverable metadata classes that
+    need to track quality review state.
+    """
+    ai_score: float | None = Field(
+        default=None,
+        description="AI quality/comprehensiveness score based on objectives and framework.",
+    )
+    ai_feedback: str | None = Field(
+        default=None, description="AI-generated feedback on the deliverable."
+    )
+    user_feedback: str | None = Field(
+        default=None, description="User-provided feedback on the deliverable."
+    )
+    user_approved: bool = Field(
+        default=False, description="Whether the user has approved the deliverable."
+    )
+    status: DeliverableStatusEnum = Field(
+        default=DeliverableStatusEnum.NOT_STARTED,
+        description="Current status of the deliverable in its lifecycle.",
+    )
+
+
 class ReportInfoMetadata(BaseModel):
     """Metadata for the research report deliverable."""
     report_name: str = Field(..., description="The name of the research report.")
     report_tiny_url: str = Field(..., description="Shortened URL where the report can be accessed.")
     report_long_url: str = Field(..., description="The long S3 URL where the report can be accessed.")
+    content: str | None = Field(
+        default=None,
+        description="The full HTML content of the deliverable. Stored here so the user can pull "
+                    "and view it directly from the site without querying blog_content separately.",
+    )
     created_at: str = Field(..., description="ISO timestamp when the report was created.")
     updated_at: str = Field(..., description="ISO timestamp when the report was last updated.")
-    ai_score: float = Field(..., description="AI quality/comprehensiveness score based on objectives and framework.")
-    ai_feedback: str = Field(..., description="AI-generated feedback on the report.")
-    user_feedback: str = Field(..., description="User-provided feedback on the report.")
-    user_approved: bool = Field(..., description="Whether the user has approved the report.")
-    status: DeliverableStatusEnum = Field(
-        default=DeliverableStatusEnum.NOT_STARTED,
-        description="Current status of the research report in its lifecycle.",
+    review_criteria: ReportReviewCriteria = Field(
+        default_factory=ReportReviewCriteria,
+        description="AI and user review state for the report deliverable.",
     )
 
 
@@ -1098,15 +1151,16 @@ class SummaryInfoMetadata(BaseModel):
     summary_name: str = Field(..., description="The name of the research summary.")
     summary_tiny_url: str = Field(..., description="Shortened URL where the summary can be accessed.")
     summary_long_url: str = Field(..., description="The long S3 URL where the summary can be accessed.")
+    content: str | None = Field(
+        default=None,
+        description="The full HTML content of the deliverable. Stored here so the user can pull "
+                    "and view it directly from the site without querying blog_content separately.",
+    )
     created_at: str = Field(..., description="ISO timestamp when the summary was created.")
     updated_at: str = Field(..., description="ISO timestamp when the summary was last updated.")
-    ai_score: float = Field(..., description="AI quality/comprehensiveness score.")
-    ai_feedback: str = Field(..., description="AI-generated feedback on the summary.")
-    user_feedback: str = Field(..., description="User-provided feedback on the summary.")
-    user_approved: bool = Field(..., description="Whether the user has approved the summary.")
-    status: DeliverableStatusEnum = Field(
-        default=DeliverableStatusEnum.NOT_STARTED,
-        description="Current status of the research summary in its lifecycle.",
+    review_criteria: ReportReviewCriteria = Field(
+        default_factory=ReportReviewCriteria,
+        description="AI and user review state for the summary deliverable.",
     )
 
 
@@ -1143,6 +1197,7 @@ class ResearchFinding(BaseModel):
     id: UUID | None = Field(default=None, description="Auto-generated unique identifier (UUID4).")
     research_project_id: UUID = Field(..., description="Foreign key to research_projects.id.")
     source: str | None = Field(default=None, description="Source / publication name or platform.")
+    author: str | None = Field(default=None, description="Author name(s).")
     pub_date: str | None = Field(default=None, description="Publication date as a string.")
     title: str | None = Field(default=None, description="Title of the research finding / article.")
     url: str | None = Field(default=None, description="URL of the source article.")
@@ -1694,6 +1749,7 @@ PYDANTIC_SCHEMAS: dict[str, type[BaseModel]] = {
     "ResearchProjectInformation": ResearchProjectInformation,
     "ReportInfoMetadata": ReportInfoMetadata,
     "SummaryInfoMetadata": SummaryInfoMetadata,
+    "ReportReviewCriteria": ReportReviewCriteria,
     "ResearchFinding": ResearchFinding,
     "FormattedResearchFindings": FormattedResearchFindings,
     "GeneratedQuery": GeneratedQuery,

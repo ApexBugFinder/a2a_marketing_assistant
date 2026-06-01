@@ -44,8 +44,8 @@ returned SQL template string directly as the `query` argument to
 `postgres_async_runner_tool` — do NOT pass file paths.
 
 Available models: research_project, research_project_information,
-formatted_research_findings, generated_query, content_strategy,
-blog_content, linkedin_post, linkedin_account, marketing_image.
+research_finding, formatted_research_findings, generated_query,
+content_strategy, blog_content, linkedin_post, linkedin_account, marketing_image.
 
 General rules when working with database fields:
 - If a field value is a dict, convert it to a JSON string before passing as a TEXT parameter.

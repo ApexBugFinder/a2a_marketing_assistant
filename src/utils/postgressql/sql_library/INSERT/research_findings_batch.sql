@@ -2,6 +2,7 @@ INSERT INTO public.research_findings(
     id,
     research_project_id,
     source,
+    author,
     pub_date,
     title,
     url,
@@ -13,11 +14,13 @@ SELECT * FROM UNNEST(
     $4::TEXT[],
     $5::TEXT[],
     $6::TEXT[],
-    $7::INTEGER[])
+    $7::TEXT[],
+    $8::INTEGER[])
     AS t(
         id,
         research_project_id,
         source,
+        author,
         pub_date,
         title,
         url,

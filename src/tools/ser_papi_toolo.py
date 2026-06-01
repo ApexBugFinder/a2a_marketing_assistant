@@ -2,6 +2,7 @@ import os
 
 from langchain.tools import tool
 from langsmith import traceable
+from mcp_server.model_schemas import ResearchFinding
 import requests
 from config.serpapi_main_topic_config import Config as MainTopicConfig
 from config.serpapi_key_aspect_config import Config as KeyAspectConfig
@@ -17,6 +18,7 @@ class _QueryInput(BaseModel):
 class SerpapiInput(BaseModel):
      query: str = Field(description="The search query to retrieve from the serpapi search tool")
      research_project_id: str = Field(description="The unique identifier for the research project")
+     reearch_cycle_count: int = Field(description="The current research cycle count, useful for tracking and enforcing caps if needed.")
 class FormattedSerpapiWebSearchResults(BaseModel):
      research_project_id: str|None = Field(description="the unique identifier for the research project")
      title: str | None = Field(description="The title of the search result", default=None)
@@ -25,7 +27,7 @@ class FormattedSerpapiWebSearchResults(BaseModel):
      date: str | None = Field(description="The date of publication of the search result", default=None)
      position: int | None = Field(description="The position of the search result in the search results page", default=None)
      snippet: str | None = Field(description="The snippet of the search result", default=None)
-
+     research_cycle_count: int | None = Field(description="The current research cycle count, useful for tracking and enforcing caps if needed.", default=None)
 class SerpApiTools:
      def __init__(self):
           self.main_topic_config = MainTopicConfig()
@@ -53,7 +55,7 @@ class SerpApiTools:
 
      # @tool("SerpAPI Main Topic Search Tool", return_direct=True)
      @traceable(run_type='tool')
-     def serpapi_main_topic_search(self, query: str, research_project_id: str) -> dict:
+     def serpapi_main_topic_search(self, query: str, research_project_id: str, research_cycle_count: int | None = None) -> dict:
           """Useful for performing a web search using the SerpAPI to retrieve relevant information and documents related to the research topic."""
 
           client = serpapi.Client(api_key=self.main_topic_config.SERP_API_KEY)
@@ -72,11 +74,11 @@ class SerpApiTools:
 
 
 
-          return self.clean_results(results, research_project_id)
+          return self.clean_results(results, research_project_id, research_cycle_count)
 
      # @tool("SerpAPI Key Aspect Search Tool", return_direct=True)
      @traceable(run_type='tool')
-     def serpapi_key_aspect_search(self, query: str, research_project_id: str) :
+     def serpapi_key_aspect_search(self, query: str, research_project_id: str, research_cycle_count: int | None = None) :
           """Useful for performing a web search using the SerpAPI to retrieve relevant information and documents related to a specific aspect of the research topic."""
           client = serpapi.Client(api_key=self.key_aspect_config.SERP_API_KEY)
           params = {
@@ -92,12 +94,12 @@ class SerpApiTools:
           }
           results = client.search(params)
 
-          return self.clean_results(results, research_project_id)
+          return self.clean_results(results, research_project_id, research_cycle_count)
 
-     def clean_results(self, results: dict, research_project_id: str) -> list[FormattedSerpapiWebSearchResults]:
+     def clean_results(self, results: dict, research_project_id: str, research_cycle_count: int | None = None) -> list[ResearchFinding]:
           """A helper function to clean the results returned by the SerpAPI and extract the relevant information."""
           print(f'Research Project ID: {research_project_id}')
-          cleaned_results: list[FormattedSerpapiWebSearchResults] = []
+          cleaned_results: list[ResearchFinding] = []
           for result in results.get('organic_results', []):
                if 'link' not in result:
                     continue
@@ -105,8 +107,8 @@ class SerpApiTools:
                if isinstance(raw_link, dict):
                     link = next(
                          (v.split('&sa=U&')[0] if v.startswith('/url?q=') else v
-                          for v in raw_link.values()
-                          if isinstance(v, str) and (v.startswith('http') or v.startswith('/url?q='))),
+                              for v in raw_link.values()
+                              if isinstance(v, str) and (v.startswith('http') or v.startswith('/url?q='))),
                          None,
                     )
                elif raw_link.startswith('/url?q='):
@@ -117,14 +119,14 @@ class SerpApiTools:
                     continue
                if not link:
                     continue
-               record = FormattedSerpapiWebSearchResults(
+               record = ResearchFinding(
                     research_project_id=research_project_id,
                     title=result.get('title', ''),
-                    link=link,
+                    url=link,
+                    author=result.get('author', ''),
                     source=result.get('source', ''),
-                    date=result.get('date', ''),
-                    position=result.get('position'),
-                    snippet=result.get('snippet', ''),
+                    pub_date=result.get('date', ''),
+                    research_cycle_count = research_cycle_count
                )
                cleaned_results.append(record)
 

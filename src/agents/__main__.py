@@ -42,6 +42,7 @@ from common.instructions.seo_blog_writer_agent_cot import SEO_BLOG_WRITER_AGENT_
 from common.instructions.linkedin_post_generator_agent_cot import LINKEDIN_POSTER_COT_INSTRUCTION
 from common.instructions.marketing_assistant_agent_cot import MARKETING_ASSISTANT_AGENT_COT_INSTRUCTION
 from common.instructions.image_generation_agent_cot import IMAGE_GENERATION_COT_INSTRUCTION
+from common.instructions.whitepaper_writer_agent import WHITEPAPER_WRITER_AGENT_COT_INSTRUCTIONS
 from common.agent_executor import GenericAgentExecutor
 from agents.marketing_assistant_agent import MarketingAssistantAgent
 from agents.planner_agent import PlannerAgent
@@ -100,6 +101,12 @@ def get_agent(agent_card: AgentCard):
                          agent_name='LinkedInPostGeneratorAgent',
                          description='Generates LinkedIn posts based on the research findings and content strategy',
                          instructions=LINKEDIN_POSTER_COT_INSTRUCTION,
+                    )
+               case 'Whitepaper Writer Agent':
+                    return MarketingAssistantAgent(
+                         agent_name='WhitepaperWriterAgent',
+                         description='Generates comprehensive, research-backed whitepapers based on research findings and content strategy',
+                         instructions=WHITEPAPER_WRITER_AGENT_COT_INSTRUCTIONS,
                     )
                case _:
                     raise ValueError(f"Unknown agent card: '{agent_card.name}'")

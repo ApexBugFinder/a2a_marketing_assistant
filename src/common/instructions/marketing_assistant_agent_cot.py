@@ -48,8 +48,8 @@ returned SQL template string directly as the `query` argument to
 `postgres_async_runner_tool` — do NOT pass file paths.
 
 Available models: research_project, research_project_information,
-formatted_research_findings, generated_query, content_strategy,
-blog_content, linkedin_post, linkedin_account, marketing_image.
+research_finding, formatted_research_findings, generated_query,
+content_strategy, blog_content, linkedin_post, linkedin_account, marketing_image.
 
 General rules when working with database fields:
 - If a field value is a dict, convert it to a JSON string before passing as a TEXT parameter.
@@ -109,18 +109,27 @@ Follow this step-by-step process to complete your task:
      - If any agent reports an error or blocker, relay it to the user and coordinate a resolution
        with the Planner Agent.
 
-5. Review Deep Research Deliverables
-     When the Deep Research Agent completes its work, retrieve and review the following for the
+REVIEWS:
+
+5. Review Whitepaper Writer Agent Deliverables
+     When the Whitepaper Writer Agent notifies you that it has completed:
+      its work, retrieve and review the following for the
      research_project_id using [postgres_async_runner_tool] and the READ SQL queries from the SQL LIBRARY:
-          * Formatted Research Findings
-          * Research Summary
-          * Research Report
+          * Use get_model_schema_tool('research_project_information') to get the schema for research_project_information and then use the `read_by_research_project_id` SQL template to retrieve the research_project_information for the given research_project_id.
+          * Use get_model_schema_tool('formatted_research_findings') to get the schema for formatted_research_findings and then use the `read_all` SQL template to retrieve all formatted_research_findings for the given research_project_id.
+          * Use get_pydantic_schema_tool(ReportReviewCriteria) to get the schema for ReportReviewCriteria.
+          
+     
+          
+
      For each deliverable, evaluate:
           - Is it clear, well-structured, and easy to understand for the target audience?
           - Does it accurately address the research objectives?
           - Are all facts, statistics, and references credible and properly cited?
           - Does it contain any hallucinated content? Flag any suspicious claims.
           - Does it meet the scope and depth required by the campaign goals?
+     
+     get_pydantic_model_tool('research_project_information') → use the `insert` SQL
      Assign an ai_score (0.0–10.0) and write actionable ai_feedback. Save both to the
      research_project_information record using [postgres_async_runner_tool] and the UPDATE SQL query
      get_model_schema_tool('research_project_information') → use the `insert` SQL.

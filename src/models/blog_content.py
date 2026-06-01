@@ -13,7 +13,7 @@ class BlogContentMetadata(BaseModel):
      blog_name: str | None = Field(default=None, description="The name of the blog post, used for the URL and Docker container name when published")
      status:   DeliverableStatus = Field(default=DeliverableStatus(status='not_started'), description="Current status of the blog content in its lifecycle")
      long_url: str | None = Field(default=None, description="The long URL where the blog content can be accessed on S3")
-     tiny_url: str | None = Field(default=None, description="The tiny URL where the blog content can be accessed, typically generated after publishing the blog post and hosting it on a server or platform that provides URL shortening services")
+     tiny_url: str | None = Field(default=None,description="The tiny URL where the blog content can be accessed, typically generated after publishing the blog post and hosting it on a server or platform that provides URL shortening services")
 
 class BlogContent(BaseModel):
      id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for this blog content record")

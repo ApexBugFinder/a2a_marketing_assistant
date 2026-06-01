@@ -323,6 +323,25 @@ aiofiles = "^25.1.0"
 [tool.poetry.group.dev.dependencies]
 isort = "^8.0.1"
 
+# =============================================================================
+# Pytest Configuration
+# =============================================================================
+# pytest is the project's test runner (poetry run pytest).
+#
+# testpaths:      Only look for tests under src/ — avoids scanning .venv/.
+# python_files:   Standard patterns for test file discovery.
+# asyncio_mode:   "auto" lets pytest handle async tests without @pytest.mark.asyncio
+#                 decorators (pytest-asyncio 1.x compatible).
+# addopts:        -v = verbose (show test names), --tb=short = compact tracebacks.
+# norecursedirs:  Skip these directories when discovering tests. Speeds up
+#                 collection and avoids importing .venv packages.
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+norecursedirs = [".venv", ".git", "__pycache__", "dist", "build", "node_modules"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
