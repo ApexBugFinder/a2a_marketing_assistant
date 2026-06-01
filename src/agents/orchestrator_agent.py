@@ -197,7 +197,11 @@ class OrchestratorAgent(BaseAgent):
                pending_question = None
 
                async for chunk in graph.run_workflow(start_node_id=start_node_id):
-                    logger.info(f"Workflow chunk: {chunk}")
+                    logger.info(
+                        f"Workflow chunk: type={type(chunk).__name__}, "
+                        f"has_artifact={chunk.HasField('artifact_update')}, "
+                        f"has_status={chunk.HasField('status_update')}"
+                    )
 
                     # Collect node-level errors surfaced by run_workflow
                     if isinstance(chunk, dict) and chunk.get('node_error'):
