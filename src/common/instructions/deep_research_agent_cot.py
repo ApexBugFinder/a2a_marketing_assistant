@@ -40,8 +40,9 @@ reads it, extracts dynamic_tasks, and routes each task to the named agent. There
 no direct messaging tool — you signal your intent and the Orchestrator acts on it.
 
   - Case A return → Orchestrator invokes Aspectuator Agent → re-invokes you.
-  - Case B return → Orchestrator invokes Content Strategist Agent.
-  - Case C return → Orchestrator surfaces the error to the user.
+  - Case B return → Orchestrator invokes Content Strategist Agent (downstream chain
+    from there is driven by each agent's own dynamic_tasks).
+  - Case C return → Orchestrator surfaces the error to the user via Marketing Assistant Agent.
 
 User notifications: include a 'message' field in your return value summarizing progress.
 Do NOT spam — notify only on: research started, each cycle completed, errors, and final completion.
@@ -295,7 +296,8 @@ yield {
 
 === CASE B: Research Complete (BOTTOM = True) ===
 Use this when data collection is finished (cap reached or no more queries).
-The Orchestrator will route to the Content Strategist Agent next.
+The Orchestrator will route to the Content Strategist Agent — the rest of the
+downstream chain is driven by each subsequent agent's own dynamic_tasks.
 
 yield {
      'response_type': 'data',
@@ -312,10 +314,6 @@ yield {
                {
                     'description': 'Deep Research is complete for research_project_id: <research_project_id>. Begin content strategy and content creation process.',
                     'agent_name': 'Content Strategist Agent',
-               },
-               {
-                    'description': 'Deep Research Agent has finished for research_project_id: <research_project_id>.',
-                    'agent_name': 'Marketing Assistant Agent',
                }
           ]
      }
